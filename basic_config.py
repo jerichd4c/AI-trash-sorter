@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow import keras
 from keras import layers
 
-# image config
+# config
 
 IMG_SIZE= (224, 224)
 BATCH_SIZE= 32
