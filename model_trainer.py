@@ -1,22 +1,26 @@
 import keras
 from keras._tf_keras.keras.optimizers import Adam
-from base_model import model
-from basic_config import EPOCHS
-from data_processor import train_generator as train_gen, validation_generator as val_gen
-from base_model import model
+from base_model import *
+from basic_config import *
+from data_processor import *
+from data_processor import *
+from base_model import *
+from basic_config import *
+from base_model import *
 
+def train_model():
 
-def compile_model(model):
+    print("Loading and preprocessing data...")
+    train_generator, validation_generator = load_and_preprocess_data(DATASET_PATH)
+
+    print("Compiling model...")
+    model = create_base_model(NUM_CLASSES)
 
     model.compile(
         optimizer=Adam(learning_rate=0.001),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
-    
-    return model
-
-def train_model():
 
     callbacks = [ 
         keras.callbacks.EarlyStopping(patience=3, restore_best_weights=True),   
@@ -26,9 +30,9 @@ def train_model():
     # first training
 
     history = model.fit(
-        train_gen,
+        train_generator,
         epochs=EPOCHS,
-        validation_data=val_gen,
+        validation_data=validation_generator,
         callbacks=callbacks
     )
 
@@ -44,11 +48,11 @@ def train_model():
     )
 
     history_fine = model.fit(
-        train_gen,
-        epochs=EPOCHS + 10,
+        train_generator,
+        epochs=10,
         initial_epoch=history.epoch[-1],
-        validation_data=val_gen,
+        validation_data=validation_generator,
         callbacks=callbacks
     )
 
-    return model, history, history_fine, train_gen, val_gen
+    return model, history, history_fine, train_generator, validation_generator

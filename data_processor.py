@@ -1,6 +1,5 @@
 from keras._tf_keras.keras.preprocessing.image import ImageDataGenerator
-from basic_config import IMG_SIZE, BATCH_SIZE, DATASET_PATH
-
+from basic_config import *
 def load_and_preprocess_data(DATASET_PATH):
 
     # data augmentation and preprocessing
