@@ -5,9 +5,10 @@ import tensorflow as tf
 from tensorflow import keras
 from keras._tf_keras.keras import layers
 from keras._tf_keras.keras.preprocessing.image import ImageDataGenerator
-from keras._tf_keras.keras.applications import EfficientNetB0
+from keras._tf_keras.keras.applications import MobileNetV2, EfficientNetB0
 from keras._tf_keras.keras.optimizers import Adam
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -15,7 +16,7 @@ import seaborn as sns
 
 IMG_SIZE= (224, 224)
 BATCH_SIZE= 8
-EPOCHS= 20
+EPOCHS= 30
 NUM_CLASSES= 12 
 DATASET_PATH= 'dataset'
 
@@ -63,7 +64,7 @@ def load_and_preprocess_data(dataset_path):
 def create_base_model(num_classes):
     # pre trained model 
     
-    base_model = EfficientNetB0( 
+    base_model = MobileNetV2( 
         weights='imagenet',
         include_top=False,
         input_shape=(224, 224, 3)
@@ -89,10 +90,17 @@ def create_base_model(num_classes):
 
 def train_model():
 
-    print("Loading and preprocessing data...")
+    print("Cargando datos...")
     train_gen, val_gen = load_and_preprocess_data(DATASET_PATH)
 
-    print("Compiling model...")
+    # if theres no data, use all data for training (debug)
+    if val_gen.samples == 0:
+        print("No se encontraron datos de validación. Usando todos los datos para entrenamiento.")
+        train_gen, val_gen = load_and_preprocess_data(DATASET_PATH)
+        # deactivate validation
+        val_gen = None
+
+    print("Compilando modelo...")
     model = create_base_model(NUM_CLASSES)
 
     model.compile(
@@ -143,8 +151,11 @@ def train_model():
 
 # evaluate model
 
-def evaluate_model(model, val_gen): 
-
+def evaluate_model(model, val_gen, train_gen=None): 
+    if val_gen is None or val_gen.samples == 0:
+        print("No hay datos de validación disponibles para evaluar el modelo.")
+        return None, None, None
+    
     predictions = model.predict(val_gen)
     y_pred = np.argmax(predictions, axis=1)
     y_true = val_gen.classes
@@ -187,15 +198,16 @@ if __name__ == "__main__":
         y_true, y_pred, class_names = evaluate_model(model, val_gen)
 
         # save the model
-        model.save('trash_sorter_model.h5')
-        print("Modelo guardado como 'trash_sorter_model.h5'")
+        model.save('waste_classifier_model.h5')
+        print("Modelo guardado como 'waster_classifier_model.h5'")
 
         # training graphs
 
         plt.figure(figsize=(12, 4))
         plt.subplot(1, 2, 1)
         plt.plot(history.history['accuracy'], label='Entrenamiento')
-        plt.plot(history.history['val_accuracy'], label='Validación')
+        if val_gen and val_gen.samples > 0:
+            plt.plot(history.history['val_accuracy'], label='Validación')
         plt.title('Precisión del modelo')
         plt.xlabel('Época')
         plt.ylabel('Precisión')
@@ -203,7 +215,13 @@ if __name__ == "__main__":
 
         plt.subplot(1, 2, 2)
         plt.plot(history.history['loss'], label='Entrenamiento')
-        plt.plot(history.history['val_loss'], label='Validación')
+        if val_gen and val_gen.samples > 0:
+            plt.plot(history.history['val_loss'], label='Validación')
+        if history_fine:
+            plt.plot(history_fine.history['loss'], label='Entrenamiento Fine-tuning')
+            if val_gen and val_gen.samples > 0:
+                plt.plot(history_fine.history['val_loss'], label='Validación Fine-tuning')
+
         plt.title('Pérdida del modelo')
         plt.xlabel('Época')
         plt.ylabel('Pérdida')
@@ -212,3 +230,5 @@ if __name__ == "__main__":
         plt.tight_layout()
         plt.savefig('training_history.png')
         plt.show()
+
+        print ("Entrenamiento completado.")
