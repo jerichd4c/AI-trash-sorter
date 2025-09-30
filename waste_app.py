@@ -59,9 +59,6 @@ def main ():
     a través de imágenes. Sube una foto de un residuo y la IA te dirá de qué tipo es y cómo reciclarlo.
     """)
 
-    st.sidebar.title("Configuracion")
-    st.sidebar.markdown("---")
-
     # load model
     model = load_model()
 
@@ -116,10 +113,9 @@ def main ():
     
     # extra info (optional)
 
-    st.sidebar.markdown("---")
     st.subheader("Información del modelo")
     st.markdown("""
-    - **Arquitectura:** Modelo de red neuronal convolucional (CNN) con EfficientNetB0 como base.
+    - **Arquitectura:** Modelo de red neuronal convolucional (CNN) con MobileNetV2 como base.
     - **Precision esperada:** ~85-90% (dependiendo del entrenamiento)
     - **Clases:** Imágenes de residuos etiquetadas en 12 categorías diferentes.
     - **Dataset:** Garbage Classification Dataset de Kaggle.
