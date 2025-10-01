@@ -11,6 +11,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
+import kagglehub
+import shutil
 
 # config
 
@@ -18,16 +20,119 @@ IMG_SIZE= (224, 224)
 BATCH_SIZE= 8
 EPOCHS= 30
 NUM_CLASSES= 12 
+KAGGLE_DATASET= "mostafaabla/garbage-classification"
 DATASET_PATH= 'dataset'
+
+# download dataset from kaggle if not exists
+
+def setup_dataset():
+
+    if os.path.exists(DATASET_PATH):
+        print(f"El directorio '{DATASET_PATH}' ya existe. Usando el dataset existente.")
+        return DATASET_PATH 
+    
+    print("Descargando dataset desde Kaggle...")
+    try:
+
+        download_path = kagglehub.dataset_download(KAGGLE_DATASET)
+        print(f"Dataset descargado en: {download_path}")
+
+        actual_dataset_path = find_image_folder(download_path)
+
+        if actual_dataset_path: 
+            print(f"Se encontro el dataset en: {actual_dataset_path}")
+
+            # creates local dirs
+            os.makedirs(DATASET_PATH, exist_ok=True)
+
+            copy_classes_to_dataset(actual_dataset_path, DATASET_PATH)  
+            return DATASET_PATH
+        else:
+            print("No se pudo encontrar el dataset dentro del archivo descargado.")
+            return None
+
+    except Exception as e:
+        print(f"Ocurrió un error al descargar el dataset: {e}")
+        return None
+
+# finds the folder with recursive search
+
+def find_image_folder(base_path):
+
+    expected_paths = [
+        "Garbage classification",
+        "Garbage Classification",
+        "garbage classification",
+        "garbage",
+        "dataset",
+        "images",
+        "train",
+        "waste"
+    ]
+
+    for root, dirs, files in os.walk(base_path):
+       
+       if len(dirs) >5:
+         
+       # verify the tags 
+
+            class_like_dirs = [d for d in dirs if any(keyword in d.lower() for keyword in 
+                                                      ['glass', 'paper', 'plastic', 'metal', 'trash', 'cardboard', 'biological', 'battery', 'clothes', 'shoes', 'electronics', 'organic'])]
+            if len(class_like_dirs) >= 5:
+                return root
+       
+            for possible_dir in expected_paths:
+                if possible_dir in dirs:
+                    return os.path.join(root, possible_dir)
+    
+    for root, dirs, files in os.walk(base_path):
+        if len(dirs) >= NUM_CLASSES:
+            return root
+        
+    return None
+
+# copy the classes to the dataset folder
+
+def copy_classes_to_dataset(source_path, dest_path):
+
+    # get all subdirs
+
+    subdirs = [d for d in os.listdir(source_path) if os.path.isdir(os.path.join(source_path, d))]
+
+    print (f"Clases encontradas: {subdirs}")
+
+    for subdir in subdirs:
+        src_dir = os.path.join(source_path, subdir)
+        dst_dir = os.path.join(dest_path, subdir)
+
+        image_files = [f for f in os.listdir(src_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))] 
+
+        if image_files: 
+            print (f"Copiando {len(image_files)} imágenes desde '{subdir}'...")
+            shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
+        else:
+            print (f"No se encontraron imágenes en la clase '{subdir}', no  contiene imagenes.")
 
 # data augmentation and preprocessing
 
 def load_and_preprocess_data(dataset_path):
 
-    # verify if theres enough data for the training
+    # verify dataset structure
 
-    classes = os.listdir(dataset_path)
-    print(f"Clases encontradas: {classes}")
+    if not os.path.exists(dataset_path):
+        print(f"El directorio '{dataset_path}' no existe.")
+        return None, None
+
+    classes = [f for f in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, f))]
+    
+    if len(classes) == 0:
+        print("No se encontraron clases en el dataset. Verifica la estructura de carpetas.")
+        return None, None
+
+    print(f"Número de clases encontradas: {len(classes)}")
+    print(f"Clases: {classes}")
+
+    # verify if theres enough data for the training
 
     total_images = 0 
 
@@ -41,17 +146,19 @@ def load_and_preprocess_data(dataset_path):
 
     print(f"Total de imágenes encontradas: {total_images}")
           
-    if total_images < NUM_CLASSES * 2:
-            print("Advertencia: No hay suficientes datos para entrenar el modelo. Se recomienda al menos 2 imágenes por clase.")
+    if total_images < NUM_CLASSES * 5:
+            print("Advertencia: No hay suficientes datos para entrenar el modelo. Se recomienda al menos 5 imágenes por clase.")
 
     train_datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
+        rotation_range=40,
+        width_shift_range=0.4,
+        height_shift_range=0.4,
         horizontal_flip=True,
-        zoom_range=0.2,
-        shear_range=0.2,
+        vertical_flip=True,
+        zoom_range=0.4,
+        shear_range=0.3,
+        brightness_range=(0.7, 1.3),
         fill_mode='nearest',
         validation_split=0.2,
     )
@@ -98,13 +205,16 @@ def create_base_model(num_classes):
     model = keras.Sequential([
         base_model, 
         layers.GlobalAveragePooling2D(),
-        layers.Dropout(0.2),
-        layers.Dense(512, activation='relu'),
-        layers.BatchNormalization(),
         layers.Dropout(0.3),
+        layers.Dense(256, activation='relu'),
+        layers.BatchNormalization(),
+        layers.Dropout(0.4),
+        layers.Dense(128, activation='relu'),
+        layers.Dropout(0.2),
         layers.Dense(num_classes, activation='softmax')
     ])
 
+    print("Modelo creado con MobileNetV2 como base.")
     return model
 
 # train model
@@ -135,16 +245,33 @@ def train_model():
         keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy' if val_gen else 'loss', factor=0.2, patience=5, min_lr=1e-7)
     ]
     
-    # first training
 
     print("Iniciando entrenamiento...")
-    history = model.fit(
-        train_gen,
-        epochs=EPOCHS,
-        validation_data=val_gen,
-        callbacks=callbacks,
-        verbose=1
-    )
+
+    # train without validation
+
+    if val_gen is None or val_gen.samples == 0:
+        history = model.fit(
+            train_gen,
+            epochs=EPOCHS,
+            callbacks=callbacks,
+            verbose=1
+        )
+
+        history_fine = None
+
+    else:
+
+
+    # first training
+
+        history = model.fit(
+            train_gen,
+            epochs=EPOCHS,
+            validation_data=val_gen,
+            callbacks=callbacks,
+            verbose=1
+        )
 
     # fine tuning only IF theres enough data
 
@@ -210,15 +337,24 @@ def evaluate_model(model, val_gen, train_gen=None):
 # main function (generates the h5 model file)
 
 if __name__ == "__main__":
+    print ("Configurando dataset...")
+    dataset_path = setup_dataset()
 
     # verify if DATASET_PATH is correctly set
-    if not os.path.exists(DATASET_PATH):
-        print(f"Error: No se encuentra el directorio '{DATASET_PATH}")
+
+    if dataset_path is None:
+        print("No se pudo configurar el dataset.") 
         print("Estructura de carpetas: dataset/clase1/ , dataset/clase2/ , ...")
-    else:
-        try:
+        exit(1)
+
+    try:
             # train the model
+            print ("Iniciando el entrenamiento del modelo...")
             model, history, history_fine, train_gen, val_gen = train_model()
+
+            if model is None:
+                print("El entrenamiento del modelo falló.")
+                exit(1)
 
             # evaluate the model (only if the validation set exists)
             if val_gen and val_gen.samples > 0:
@@ -274,7 +410,7 @@ if __name__ == "__main__":
 
             print ("Entrenamiento completado.")
 
-        except Exception as e:
+    except Exception as e:
             print(f"Ocurrió un error durante el entrenamiento: {e}")
             print("Cosas a verificar:")
             print("1. Aumenta el numero de imágenes en el dataset.")
