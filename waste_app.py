@@ -97,7 +97,7 @@ def main ():
             predicted_class = np.argmax(predictions[0])
             class_name = CLASS_NAMES[predicted_class]
 
-            st.subheader("Descripción del residuo: {class_name}:")
+            st.subheader(f"Descripción del residuo: {class_name}")
             st.info(CLASS_DESCRIPTIONS.get(class_name, "Consulta la guía local de reciclaje para más información."))
 
             # probability bar chart
