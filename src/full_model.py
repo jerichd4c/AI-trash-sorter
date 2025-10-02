@@ -5,10 +5,10 @@ import tensorflow as tf
 from tensorflow import keras
 from keras._tf_keras.keras import layers
 from keras._tf_keras.keras.preprocessing.image import ImageDataGenerator
-from keras._tf_keras.keras.applications import MobileNetV2, EfficientNetB0
+from keras._tf_keras.keras.applications import MobileNetV2
 from keras._tf_keras.keras.optimizers import Adam
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
 import seaborn as sns
 import kagglehub
@@ -18,7 +18,7 @@ import shutil
 
 IMG_SIZE= (224, 224)
 BATCH_SIZE= 16
-EPOCHS= 25
+EPOCHS= 30
 NUM_CLASSES= 12 
 KAGGLE_DATASET= "mostafaabla/garbage-classification"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
@@ -142,6 +142,7 @@ def load_and_preprocess_data(dataset_path):
     # verify if theres enough data for the training
 
     total_images = 0 
+    class_counts = {}
 
     for class_name in classes: 
         class_path = os.path.join(dataset_path, class_name)
@@ -149,27 +150,36 @@ def load_and_preprocess_data(dataset_path):
             num_images = len([f for f in os.listdir(class_path)
                         if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
             print(f"Clase '{class_name}': {num_images} imágenes")
+            class_counts[class_name] = num_images
             total_images += num_images
 
     print(f"Total de imágenes encontradas: {total_images}")
+
+    # calc class weights
+    class_weights = compute_class_weight(
+        'balanced',
+        classes=np.array(list(class_counts.keys())),
+        y=np.repeat(list(class_counts.keys()), list(class_counts.values()))
+    )
+    class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
           
     if total_images < NUM_CLASSES * 5:
             print("Advertencia: No hay suficientes datos para entrenar el modelo. Se recomienda al menos 5 imágenes por clase.")
 
     train_datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=40,
-        width_shift_range=0.4,
-        height_shift_range=0.4,
+        rotation_range=20,
+        width_shift_range=0.2,
+        height_shift_range=0.2,
         horizontal_flip=True,
-        vertical_flip=True,
-        zoom_range=0.4,
-        shear_range=0.3,
-        brightness_range=(0.7, 1.3),
+        vertical_flip=False,
+        zoom_range=0.2,
+        shear_range=0.1,
+        brightness_range=(0.8, 1.2),
         fill_mode='nearest',
         validation_split=0.2,
     )
-
+    
     # load training data
 
     train_generator = train_datagen.flow_from_directory(
@@ -192,13 +202,13 @@ def load_and_preprocess_data(dataset_path):
         shuffle=True
     )
 
-    return train_generator, validation_generator
+    return train_generator, validation_generator, class_weight_dict
 
 # create model
 
 def create_base_model(num_classes):
     # pre trained model 
-    9
+
     base_model = MobileNetV2( 
         weights='imagenet',
         include_top=False,
@@ -212,11 +222,13 @@ def create_base_model(num_classes):
     model = keras.Sequential([
         base_model, 
         layers.GlobalAveragePooling2D(),
-        layers.Dropout(0.3),
-        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.5),
+        layers.Dense(512, activation='relu'),
         layers.BatchNormalization(),
-        layers.Dropout(0.4),
-        layers.Dense(128, activation='relu'),
+        layers.Dropout(0.5),
+        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.3),
+        layers.Dense(128, activation='relu'),   
         layers.Dropout(0.2),
         layers.Dense(num_classes, activation='softmax')
     ])
@@ -229,12 +241,19 @@ def create_base_model(num_classes):
 def train_model():
 
     print("Cargando datos...")
-    train_gen, val_gen = load_and_preprocess_data(DATASET_PATH)
+    train_gen, val_gen, class_weight_dict = load_and_preprocess_data(DATASET_PATH)
+
+    if train_gen is None:
+
+        print("No se encontraron datos de entrenamiento. Verifique la estructura de carpetas.")
+        return None, None, None, None, None
+    
+    print(f"Pesos de clases: {class_weight_dict}")
 
     # if theres no data, use all data for training (debug)
     if val_gen.samples == 0:
         print("No se encontraron datos de validación. Usando todos los datos para entrenamiento.")
-        train_gen, val_gen = load_and_preprocess_data(DATASET_PATH)
+        train_gen, val_gen, class_weight_dict = load_and_preprocess_data(DATASET_PATH)
         # deactivate validation
         val_gen = None
 
@@ -242,14 +261,14 @@ def train_model():
     model = create_base_model(NUM_CLASSES)
 
     model.compile(
-        optimizer=Adam(learning_rate=0.001),
+        optimizer=Adam(learning_rate=0.0005),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
 
     callbacks = [ 
-        keras.callbacks.EarlyStopping(monitor='val_accuracy' if val_gen else 'accuracy', patience=8, restore_best_weights=True),   
-        keras.callbacks.ReduceLROnPlateau(monitor='val_accuracy' if val_gen else 'loss', factor=0.2, patience=5, min_lr=1e-7)
+        keras.callbacks.EarlyStopping(monitor='val_accuracy' if val_gen else 'accuracy', patience=10, restore_best_weights=True, min_delta=0.001),   
+        keras.callbacks.ReduceLROnPlateau(monitor='val_loss' if val_gen else 'loss', factor=0.2, patience=5, min_lr=1e-7, min_delta=0.001)
     ]
     
 
@@ -262,6 +281,7 @@ def train_model():
             train_gen,
             epochs=EPOCHS,
             callbacks=callbacks,
+            class_weight=class_weight_dict,
             verbose=1
         )
 
@@ -277,15 +297,21 @@ def train_model():
             epochs=EPOCHS,
             validation_data=val_gen,
             callbacks=callbacks,
+            class_weight=class_weight_dict,
             verbose=1
         )
 
     # fine tuning only IF theres enough data
 
-    if train_gen.samples > 50:
+    if train_gen.samples > 50 and history is not None:
         print("Iniciando fine-tuning...")
         base_model = model.layers[0]
         base_model.trainable = True
+
+        # fine-tune from this layer onwards
+
+        for layer in base_model.layers[:-20]:
+            layer.trainable = False
 
         model.compile(
             optimizer=Adam(learning_rate=0.0001),
@@ -295,10 +321,11 @@ def train_model():
 
         history_fine = model.fit(
             train_gen,
-            epochs=EPOCHS+10,
+            epochs=EPOCHS+15,
             initial_epoch=history.epoch[-1],
             validation_data=val_gen,
             callbacks=callbacks,
+            class_weight=class_weight_dict,
             verbose=1
         )   
     else :
@@ -373,8 +400,8 @@ if __name__ == "__main__":
                 print("No se evaluó el modelo debido a la falta de datos de validación.")
 
             # save the model
-            model.save(MODE_SAVE_PATH)
-            print(f"Modelo guardado como: {MODE_SAVE_PATH}")
+            model.save(MODEL_SAVE_PATH)
+            print(f"Modelo guardado como: {MODEL_SAVE_PATH}")
 
             # training graphs
 
