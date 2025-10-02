@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
+import full_model as fm
 
 # page config
 
@@ -37,7 +38,7 @@ CLASS_DESCRIPTIONS = {
 @st.cache_resource
 def load_model():
     try: 
-        model = tf.keras.models.load_model('waste_classifier_model.h5')
+        model = tf.keras.models.load_model(fm.MODEL_SAVE_PATH)
         return model
     except: 
         st.error("Error al cargar el modelo. Asegúrate de que el archivo 'waste_classifier_model.h5' existe.")

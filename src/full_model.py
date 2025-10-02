@@ -24,7 +24,7 @@ KAGGLE_DATASET= "mostafaabla/garbage-classification"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
 DATASET_PATH= os.path.join(BASE_DIR, 'dataset') 
 RESULTS_DIR = os.path.join(BASE_DIR, 'results')
-MODE_SAVE_PATH = os.path.join(BASE_DIR, 'waste_classifier_model.h5')
+MODEL_SAVE_PATH = os.path.join(BASE_DIR, 'waste_classifier_model.h5')
 
 # creat dir if not exists
 
