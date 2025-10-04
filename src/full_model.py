@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
-from keras._tf_keras.keras import layers
-from keras._tf_keras.keras.preprocessing.image import ImageDataGenerator
-from keras._tf_keras.keras.applications import MobileNetV2
-from keras._tf_keras.keras.optimizers import Adam
+from tensorflow.keras import layers
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2, EfficientNetB0   
+from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
 import matplotlib.pyplot as plt
@@ -19,8 +19,7 @@ import shutil
 IMG_SIZE= (224, 224)
 BATCH_SIZE= 16
 EPOCHS= 30
-NUM_CLASSES= 12 
-KAGGLE_DATASET= "mostafaabla/garbage-classification"
+KAGGLE_DATASET= "feyzazkefe/trashnet"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
 DATASET_PATH= os.path.join(BASE_DIR, 'dataset') 
 RESULTS_DIR = os.path.join(BASE_DIR, 'results')
@@ -66,36 +65,33 @@ def setup_dataset():
 
 def find_image_folder(base_path):
 
-    expected_paths = [
-        "Garbage classification",
-        "Garbage Classification",
-        "garbage classification",
-        "garbage",
-        "dataset",
-        "images",
-        "train",
-        "waste"
+    class_patterns = [
+        'glass', 'paper', 'plastic', 'metal', 'trash', 
+        'cardboard', 'biological', 'battery', 'clothes', 
+        'shoes', 'electronics', 'organic'
     ]
 
     for root, dirs, files in os.walk(base_path):
-       
-       if len(dirs) >5:
          
        # verify the tags 
 
-            class_like_dirs = [d for d in dirs if any(keyword in d.lower() for keyword in 
-                                                      ['glass', 'paper', 'plastic', 'metal', 'trash', 'cardboard', 'biological', 'battery', 'clothes', 'shoes', 'electronics', 'organic'])]
-            if len(class_like_dirs) >= 5:
-                return root
-       
-            for possible_dir in expected_paths:
-                if possible_dir in dirs:
-                    return os.path.join(root, possible_dir)
+        class_dirs = [d for d in dirs if any(pattern in d.lower() for pattern in class_patterns)]
+
+        if len(class_dirs) >= 5:
+                has_images = True
+                for class_dir in class_dirs:
+                    class_path = os.path.join(root, class_dir)
+                    if not any(f.lower().endswith(('.png', '.jpg', '.jpeg')) for f in os.listdir(class_path)):
+                        has_images = False
+                        break
+                if has_images:
+                    return root
     
+    # Búsqueda alternativa
     for root, dirs, files in os.walk(base_path):
-        if len(dirs) >= NUM_CLASSES:
+        if len(dirs) >= 5:
             return root
-        
+
     return None
 
 # copy the classes to the dataset folder
@@ -120,68 +116,93 @@ def copy_classes_to_dataset(source_path, dest_path):
         else:
             print (f"No se encontraron imágenes en la clase '{subdir}', no  contiene imagenes.")
 
-# data augmentation and preprocessing
+# verify dataset
 
-def load_and_preprocess_data(dataset_path):
+def verify_dataset_integrity(dataset_path):
 
-    # verify dataset structure
+    # verify the dataset is correctly structured
 
+    print ("Verificando dataset")
     if not os.path.exists(dataset_path):
         print(f"El directorio '{dataset_path}' no existe.")
-        return None, None
+        return False
 
     classes = [f for f in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, f))]
     
-    if len(classes) == 0:
-        print("No se encontraron clases en el dataset. Verifica la estructura de carpetas.")
-        return None, None
+    if len(classes) < 2:
+        print("Se necesitan al menos 2 clases para entrenar.")
+        return False
 
-    print(f"Número de clases encontradas: {len(classes)}")
-    print(f"Clases: {classes}")
-
-    # verify if theres enough data for the training
-
-    total_images = 0 
-    class_counts = {}
+    print(f"Número de clases encontradas: {classes}")
+    total_images = 0
 
     for class_name in classes: 
         class_path = os.path.join(dataset_path, class_name)
-        if os.path.isdir(class_path):
-            num_images = len([f for f in os.listdir(class_path)
-                        if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
-            print(f"Clase '{class_name}': {num_images} imágenes")
-            class_counts[class_name] = num_images
-            total_images += num_images
+        images = [f for f in os.listdir(class_path)
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
 
-    print(f"Total de imágenes encontradas: {total_images}")
+        print(f"Clase '{class_name}': {len(images)} imágenes")
+        
+        if images: 
+            sample_image = os.path.join(class_path, images[0])  
+            try: 
+                img = tf.keras.preprocessing.image.load_img(sample_image)
+                img_array = tf.keras.preprocessing.image.img_to_array(img)
+                print(f"Imagen de muestra cargada de la clase '{images[0]}': {img_array.shape}")
 
-    # calc class weights
-    class_weights = compute_class_weight(
-        'balanced',
-        classes=np.array(list(class_counts.keys())),
-        y=np.repeat(list(class_counts.keys()), list(class_counts.values()))
-    )
-    class_weight_dict = {i: class_weights[i] for i in range(len(class_weights))}
-          
-    if total_images < NUM_CLASSES * 5:
-            print("Advertencia: No hay suficientes datos para entrenar el modelo. Se recomienda al menos 5 imágenes por clase.")
+            except Exception as e:
+                print(f"Ocurrio un error al cargar la imagen de muestra de la clase '{images[0]}': {e}")
+                return False
+        else: 
+            print (f"La clase '{class_name}' no contiene imagenes validas.")
+            return False
+            
+        total_images += len(images)
+        
+    print(f"Total de imágenes validas: {total_images}")
+
+    if total_images < len(classes) * 10:
+        print("Se necesitan al menos 10 imágenes por clase para entrenar.")
+
+    return True
+        
+
+# IMPORTANT: get correct weight
+
+def get_class_weights(dataset_path):
+
+    all_labels = []
+
+    classes = sorted([f for f in os.listdir(dataset_path) if os.path.isdir(os.path.join(dataset_path, f))])
+
+    print("Calculando pesos de clase...")
+
+    for class_idx, class_name in enumerate(classes):
+        class_path = os.path.join(dataset_path, class_name)
+        num_images = len([f for f in os.listdir(class_path)
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+        all_labels.extend([class_idx] * num_images)
+        print(f"Clase '{class_name}' (índice {class_idx}): {num_images} imágenes")
+
+    # calc weights 
+
+    class_weights = compute_class_weight('balanced', classes=np.unique(all_labels), y=all_labels)
+
+    class_weight_dict = {i: weight for i, weight in enumerate(class_weights)}
+    print(f"Pesos calculados: {class_weight_dict}")
+    return class_weight_dict
+
+# DEBUGGER
+
+def debug_data_generators(dataset_path): 
+    print("Debuggeando Generadores...")
 
     train_datagen = ImageDataGenerator(
         rescale=1./255,
-        rotation_range=20,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        horizontal_flip=True,
-        vertical_flip=False,
-        zoom_range=0.2,
-        shear_range=0.1,
-        brightness_range=(0.8, 1.2),
-        fill_mode='nearest',
         validation_split=0.2,
     )
     
-    # load training data
-
     train_generator = train_datagen.flow_from_directory(
         dataset_path,
         target_size=IMG_SIZE,
@@ -199,10 +220,79 @@ def load_and_preprocess_data(dataset_path):
         class_mode='categorical',
         subset='validation',
         color_mode='rgb',
-        shuffle=True
+        shuffle=False
+    )
+    
+    print(f"Clases encontradas: {train_generator.class_indices}")
+    print(f"Número de imágenes de entrenamiento: {train_generator.samples}")
+    print(f"Número de imágenes de validación: {validation_generator.samples}")
+    
+    # Verificar un batch
+    try:
+        x_batch, y_batch = next(train_generator)
+        print(f"Forma del batch: {x_batch.shape}")
+        print(f"Rango de pixeles: [{x_batch.min():.3f}, {x_batch.max():.3f}]")
+        print(f"Ejemplo de etiqueta one-hot: {y_batch[0]}")
+        print(f"Clase predicha: {np.argmax(y_batch[0])}")
+    except Exception as e:
+        print(f"Error al cargar batch: {e}")
+    
+    class_weights = get_class_weights(dataset_path)
+    
+    return train_generator, validation_generator, class_weights
+
+# data augmentation and preprocessing
+
+def load_and_preprocess_data(dataset_path):
+
+    # verify dataset structure
+
+    if not verify_dataset_integrity(dataset_path):
+        return None, None, None
+    
+    # verify if theres enough data for the training
+
+    train_datagen = ImageDataGenerator(
+        rescale=1./255,
+        rotation_range=30,
+        width_shift_range=0.3,
+        height_shift_range=0.3,
+        horizontal_flip=True,
+        vertical_flip=True,
+        zoom_range=0.3,
+        shear_range=0.2,
+        brightness_range=(0.7, 1.3),
+        channel_shift_range=0.2,
+        fill_mode='nearest',
+        validation_split=0.2
+    )
+    
+    # load training data
+
+    train_generator = train_datagen.flow_from_directory(
+        dataset_path,
+        target_size=IMG_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode='categorical',
+        subset='training',
+        color_mode='rgb',
+        shuffle=True,
+        seed=42
     )
 
-    return train_generator, validation_generator, class_weight_dict
+    validation_generator = train_datagen.flow_from_directory(
+        dataset_path,
+        target_size=IMG_SIZE,
+        batch_size=BATCH_SIZE,
+        class_mode='categorical',
+        subset='validation',
+        color_mode='rgb',
+        shuffle=False
+    )
+
+    class_weights= get_class_weights(dataset_path)
+
+    return train_generator, validation_generator, class_weights
 
 # create model
 
@@ -222,13 +312,12 @@ def create_base_model(num_classes):
     model = keras.Sequential([
         base_model, 
         layers.GlobalAveragePooling2D(),
-        layers.Dropout(0.5),
-        layers.Dense(512, activation='relu'),
-        layers.BatchNormalization(),
-        layers.Dropout(0.5),
+        layers.Dropout(0.4),
         layers.Dense(256, activation='relu'),
+        layers.BatchNormalization(),
         layers.Dropout(0.3),
-        layers.Dense(128, activation='relu'),   
+        layers.Dense(128, activation='relu'),
+        layers.BatchNormalization(),
         layers.Dropout(0.2),
         layers.Dense(num_classes, activation='softmax')
     ])
@@ -238,105 +327,96 @@ def create_base_model(num_classes):
 
 # train model
 
-def train_model():
+def train_model(dataset_path):
 
-    print("Cargando datos...")
-    train_gen, val_gen, class_weight_dict = load_and_preprocess_data(DATASET_PATH)
+    # DEBUGGER
+
+    train_gen, val_gen, class_weights = debug_data_generators(dataset_path)
 
     if train_gen is None:
 
         print("No se encontraron datos de entrenamiento. Verifique la estructura de carpetas.")
         return None, None, None, None, None
     
-    print(f"Pesos de clases: {class_weight_dict}")
+    num_classes= len(train_gen.class_indices)
 
-    # if theres no data, use all data for training (debug)
-    if val_gen.samples == 0:
-        print("No se encontraron datos de validación. Usando todos los datos para entrenamiento.")
-        train_gen, val_gen, class_weight_dict = load_and_preprocess_data(DATASET_PATH)
-        # deactivate validation
-        val_gen = None
+    print(f"Entrenando modelo con {num_classes} clases...")
 
-    print("Compilando modelo...")
-    model = create_base_model(NUM_CLASSES)
+    model= create_base_model(num_classes)
 
     model.compile(
-        optimizer=Adam(learning_rate=0.0005),
+        optimizer=Adam(learning_rate=0.001),
         loss='categorical_crossentropy',
         metrics=['accuracy']
     )
 
-    callbacks = [ 
-        keras.callbacks.EarlyStopping(monitor='val_accuracy' if val_gen else 'accuracy', patience=10, restore_best_weights=True, min_delta=0.001),   
-        keras.callbacks.ReduceLROnPlateau(monitor='val_loss' if val_gen else 'loss', factor=0.2, patience=5, min_lr=1e-7, min_delta=0.001)
+    # callbacks
+
+    callbacks = [
+        keras.callbacks.EarlyStopping(
+            monitor='val_accuracy', 
+            patience=12, 
+            restore_best_weights=True,
+            min_delta=0.005,
+            mode='max',
+        ),
+        keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.2,
+            patience=5,
+            min_lr=1e-7,
+            min_delta=0.01,
+        )
     ]
     
-
     print("Iniciando entrenamiento...")
-
-    # train without validation
-
-    if val_gen is None or val_gen.samples == 0:
-        history = model.fit(
-            train_gen,
-            epochs=EPOCHS,
-            callbacks=callbacks,
-            class_weight=class_weight_dict,
-            verbose=1
-        )
-
-        history_fine = None
-
-    else:
-
 
     # first training
 
-        history = model.fit(
-            train_gen,
-            epochs=EPOCHS,
-            validation_data=val_gen,
-            callbacks=callbacks,
-            class_weight=class_weight_dict,
-            verbose=1
-        )
+    history = model.fit(
+        train_gen,
+        epochs=EPOCHS,
+        validation_data=val_gen,
+        callbacks=callbacks,
+        class_weight=class_weights,
+        verbose=1
+    )
 
-    # fine tuning only IF theres enough data
+    # fine tuning only if base training was good enough
 
-    if train_gen.samples > 50 and history is not None:
+    if history.history['val_accuracy'][-1] > 0.6:  
         print("Iniciando fine-tuning...")
         base_model = model.layers[0]
         base_model.trainable = True
-
-        # fine-tune from this layer onwards
+        
+        # fine-tuning only for the last 20 layers
 
         for layer in base_model.layers[:-20]:
             layer.trainable = False
-
+        
         model.compile(
-            optimizer=Adam(learning_rate=0.0001),
+            optimizer=Adam(learning_rate=0.0001/10),
             loss='categorical_crossentropy',
-            metrics=['accuracy']
+            metrics=['accuracy', 'precision', 'recall']
         )
-
+        
         history_fine = model.fit(
             train_gen,
-            epochs=EPOCHS+15,
-            initial_epoch=history.epoch[-1],
+            epochs=8,
             validation_data=val_gen,
             callbacks=callbacks,
-            class_weight=class_weight_dict,
+            class_weight=class_weights,
             verbose=1
-        )   
-    else :
-        history_fine = None 
-        print("No hay suficientes datos para fine-tuning.")
-
+        )
+    else:
+        print("Accuracy muy baja, omitiendo fine-tuning.")
+        history_fine = None
+    
     return model, history, history_fine, train_gen, val_gen
 
 # evaluate model
 
-def evaluate_model(model, val_gen, train_gen=None): 
+def evaluate_model(model, val_gen): 
     if val_gen is None or val_gen.samples == 0:
         print("No hay datos de validación disponibles para evaluar el modelo.")
         return None, None, None
@@ -354,7 +434,7 @@ def evaluate_model(model, val_gen, train_gen=None):
 
     # confusion matrix
 
-    plt.figure(figsize=(12,10))
+    plt.figure(figsize=(14,12))
     cm = confusion_matrix(y_true, y_pred)
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
     plt.title('Matriz de Confusión')
@@ -387,7 +467,7 @@ if __name__ == "__main__":
     try:
             # train the model
             print ("Iniciando el entrenamiento del modelo...")
-            model, history, history_fine, train_gen, val_gen = train_model()
+            model, history, history_fine, train_gen, val_gen = train_model(dataset_path)
 
             if model is None:
                 print("El entrenamiento del modelo falló.")
