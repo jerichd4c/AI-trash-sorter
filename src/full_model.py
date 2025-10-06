@@ -5,7 +5,7 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import MobileNetV2, EfficientNetB0   
+from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.optimizers import Adam
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
@@ -18,8 +18,8 @@ import shutil
 
 IMG_SIZE= (224, 224)
 BATCH_SIZE= 16
-EPOCHS= 30
-KAGGLE_DATASET= "feyzazkefe/trashnet"
+EPOCHS= 35
+KAGGLE_DATASET= "mostafaabla/garbage-classification"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  
 DATASET_PATH= os.path.join(BASE_DIR, 'dataset') 
 RESULTS_DIR = os.path.join(BASE_DIR, 'results')
@@ -355,17 +355,16 @@ def train_model(dataset_path):
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor='val_accuracy', 
-            patience=12, 
+            patience=15, 
             restore_best_weights=True,
             min_delta=0.005,
             mode='max',
         ),
         keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss',
-            factor=0.2,
-            patience=5,
-            min_lr=1e-7,
-            min_delta=0.01,
+            factor=0.5,
+            patience=3,
+            min_lr=1e-5,
         )
     ]
     
@@ -384,7 +383,7 @@ def train_model(dataset_path):
 
     # fine tuning only if base training was good enough
 
-    if history.history['val_accuracy'][-1] > 0.6:  
+    if history.history['val_accuracy'][-1] > 0.65:  
         print("Iniciando fine-tuning...")
         base_model = model.layers[0]
         base_model.trainable = True

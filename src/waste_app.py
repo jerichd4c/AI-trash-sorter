@@ -117,7 +117,7 @@ def main ():
     st.subheader("Información del modelo")
     st.markdown("""
     - **Arquitectura:** Modelo de red neuronal convolucional (CNN) con MobileNetV2 como base.
-    - **Precision esperada:** ~85-90% (dependiendo del entrenamiento)
+    - **Precision esperada:** ~85-95% (dependiendo del entrenamiento)
     - **Clases:** Imágenes de residuos etiquetadas en 12 categorías diferentes.
     - **Dataset:** Garbage Classification Dataset de Kaggle.
     - **Nota:** La precisión del modelo puede variar según la calidad y el ángulo de la imagen subida.
