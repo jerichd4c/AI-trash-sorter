@@ -1,82 +1,145 @@
+<!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
+<a id="readme-top"></a>
 
-# Trash Sorter usando IA 🤖
+<h3 align="center">AI Trash Sorter 🤖</h3>
 
-Trash sorter basico (Clasificador de residuos) creado en **Python** usando IA, redes neuronales convolucionales y machine learning para entrenarse ella misma y clasificar diferentes tipos de residuos siguiendo el dataset de Kaggle: [Garbage Classification](https://www.kaggle.com/datasets/mostafaabla/garbage-classification)
-12 categorias (ir al link para mas referencia)
-
-## Requerimientos previos ⚠️
-
-Antes de usar el proyecto, tendra que instalar las dependencias almacenadas en el archivo: **requeriments.txt**
-
-Para instalar el archivo, escribe esto en el terminal:
-
-```bash
-pip install requeriments.txt
-```
-    
-## Crear el modelo 📦
-
-<div align="center">
-
-❗**IMPORTANTE**❗
-
+  <p align="center">
+    A basic waste classifier built in Python using Convolutional Neural Networks (CNN).
+  </p>
 </div>
 
-El repositorio ya tiene un modelo pre-entrenado: **waste_classifier_model.h5** sin embargo, en caso de que el archivo se pierda o se quiera recompilar con otros valores, se tiene que realizar lo siguiente: 
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#examples">Examples</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
 
-Escribir en el terminal:
+<!-- ABOUT THE PROJECT -->
+## About The Project
 
-```bash
-python run src\full_model.py 
+Basic Trash Sorter (Waste Classifier) created in **Python** using AI, convolutional neural networks, and machine learning to self-train and classify different types of waste following the Kaggle dataset: [Garbage Classification](https://www.kaggle.com/datasets/mostafaabla/garbage-classification).
+
+It supports 12 waste categories for efficient classification.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Built With
+
+* [![Python][Python-shield]][Python-url]
+* [![TensorFlow][TensorFlow-shield]][TensorFlow-url]
+* [![Streamlit][Streamlit-shield]][Streamlit-url]
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- GETTING STARTED -->
+## Getting Started
+
+To get a local copy up and running, follow these simple steps.
+
+### Prerequisites
+
+Ensure you have Python installed. Then, install the necessary dependencies:
+* pip
+  ```sh
+  pip install -r requeriments.txt
+  ```
+
+### Installation
+
+1. Clone the repo
+   ```sh
+   git clone https://github.com/jerichd4c/IA-trash-sorter.git
+   ```
+2. Install the necessary packages
+   ```sh
+   pip install -r requeriments.txt
+   ```
+3. Ensure the model `waste_classifier_model.h5` is in the root directory of the project.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+<!-- USAGE EXAMPLES -->
+## Usage
+
+### Running the Application
+To start the user interface with Streamlit:
+```sh
+streamlit run src/waste_app.py
 ```
 
-(*dependiendo del dataset y los valores predefinidos el compilador puede tardarse*)
-
-## Ejecutar el proyecto 🚀 
-
-Una vez con el modelo en  el directorio base, se tiene ejecutar en el terminal el siguiente comando:
-
-```bash
-python run src\waste_app.py 
+### Training or Recompiling the Model
+If you want to retrain the model:
+```sh
+python src/full_model.py
 ```
+*Note: The process may take time depending on the hardware and dataset size.*
 
-*NT: esta app usa la libreria **Streamlit**, diseñada para crear UIs simples en *Python**.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-
-## Ejemplos de uso ♻️ 
+<!-- EXAMPLES -->
+## Examples
 
 <div align="center">
 
-**Tipo de desecho: clothes/ropa**
-
+**Waste type: clothes**
 ![Example classification 1](results/examples/example_1.png)
-
-**Estadisticas usando modelo preentrenado:**
-
+*Statistics:*
 ![Example classification 1 stats](results/examples/example_1_stats.png)
 
-**Tipo de desecho: cardboard/carton**
-
+**Waste type: cardboard**
 ![Example classification 2](results/examples/example_2.png)
-
-**Estadisticas usando modelo preentrenado:**
-
+*Statistics:*
 ![Example classification 2 stats](results/examples/example_2_stats.png)
 
-**Tipo de desecho: battery/bateria**
-
+**Waste type: battery**
 ![Example classification 3](results/examples/example_3.png)
-
-**Estadisticas usando modelo preentrenado:**
-
+*Statistics:*
 ![Example classification 3 stats](results/examples/example_3_stats.png)
 
-*NT: Hay tipos de desechos con prediccion mas favorables que otros, si se quiere ser mas exacto en clases especificas, es necesario usar otros datasets*.
-
----
-
-⚠️ **ADVERTENCIA** ⚠️
 </div>
 
-El archivo **waste_classifier_model.h5** tiene que estar en la ruta base del proyecto, de lo contrario, saldra un mensaje indicando que no hay un modelo existente.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+<!-- MARKDOWN LINKS & IMAGES -->
+[contributors-shield]: https://img.shields.io/github/contributors/jerichd4c/IA-trash-sorter.svg?style=for-the-badge
+[contributors-url]: https://github.com/jerichd4c/IA-trash-sorter/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/jerichd4c/IA-trash-sorter.svg?style=for-the-badge
+[forks-url]: https://github.com/jerichd4c/IA-trash-sorter/network/members
+[stars-shield]: https://img.shields.io/github/stars/jerichd4c/IA-trash-sorter.svg?style=for-the-badge
+[stars-url]: https://github.com/jerichd4c/IA-trash-sorter/stargazers
+[issues-shield]: https://img.shields.io/github/issues/jerichd4c/IA-trash-sorter.svg?style=for-the-badge
+[issues-url]: https://github.com/jerichd4c/IA-trash-sorter/issues
+[license-shield]: https://img.shields.io/github/license/jerichd4c/IA-trash-sorter.svg?style=for-the-badge
+[license-url]: https://github.com/jerichd4c/IA-trash-sorter/blob/main/LICENSE
+[Python-shield]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
+[Python-url]: https://www.python.org/
+[TensorFlow-shield]: https://img.shields.io/badge/TensorFlow-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white
+[TensorFlow-url]: https://www.tensorflow.org/
+[Streamlit-shield]: https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white
+[Streamlit-url]: https://streamlit.io/
+
+<!-- ACKNOWLEDGMENTS -->
+## Acknowledgments
+
+* [Kaggle Garbage Classification Dataset](https://www.kaggle.com/datasets/mostafaabla/garbage-classification)
+* [Streamlit Documentation](https://docs.streamlit.io/)
+* [TensorFlow Guide](https://www.tensorflow.org/guide)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
