@@ -1,7 +1,7 @@
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
 <a id="readme-top"></a>
 
-<h3 align="center">AI Trash Sorter 🤖</h3>
+<h3 align="center">AI Trash Sorter </h3>
 
   <p align="center">
     A basic waste classifier built in Python using Convolutional Neural Networks (CNN).
