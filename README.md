@@ -1,6 +1,12 @@
 <!-- Improved compatibility of back to top link: See: https://github.com/othneildrew/Best-README-Template/pull/73 -->
 <a id="readme-top"></a>
 
+<!-- LANGUAGE BADGE -->
+<div align="center">
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python" width="200" height="40">
+</div>
+
+
 <h3 align="center">AI Trash Sorter </h3>
 
   <p align="center">
